@@ -1,8 +1,8 @@
 #### Follows John Carmacks .plan file format
-*= completed on day
-+= copmleted previous days work on current day
--= decided against
-none= task not completed
+*= completed on day  
++= copmleted previous days work on current day  
+-= decided against  
+none= task not completed  
 
 ### -= 12/26/2024 =-
 
@@ -28,17 +28,17 @@ Add sound effect for ball paddle hit
 
 ### -= 12/28/2024 =-
 
-*Finished Start Scene
-*Draw Ball
-*Draw CPU paddle
-*Top/bottom screen position clamped for paddles
-*Randomize ball start vector
-*Ball bouncing off top & bottom of screen
+*Finished Start Scene  
+*Draw Ball  
+*Draw CPU paddle  
+*Top/bottom screen position clamped for paddles  
+*Randomize ball start vector  
+*Ball bouncing off top & bottom of screen  
 
-Next Round After Score
-CPU Paddle AI
-Game Over Scene
-Add Sound FX for ball bounce
-Add Sound FX Ball paddle hit
-Add Sound FX for Goal Score
+Next Round After Score  
+CPU Paddle AI  
+Game Over Scene  
+Add Sound FX for ball bounce  
+Add Sound FX Ball paddle hit  
+Add Sound FX for Goal Score  
 
