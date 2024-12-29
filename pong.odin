@@ -2,17 +2,22 @@ package game
 
 import    "core:fmt"
 import    "core:math/linalg"
+import	  "core:math/rand"
 import rl "vendor:raylib"
 
 WINDOW_WIDTH  :: 1080
 WINDOW_HEIGHT :: 720
 WINDOW_CENTER :: WINDOW_WIDTH / 2 
-LINE_WIDTH    :: 2
+LINE_WIDTH    :: 1 
 LINE_HEIGHT   :: 16
 LINE_SPACING  :: 8
 PADDLE_WIDTH  :: 12
 PADDLE_HEIGHT :: 40
 PADDLE_SPEED  :: 30
+BALL_SPEED    :: 5
+BALL_SIZE     :: 10
+MAX_SCORE     :: 5
+SPEED_INC     :: 0.2
 
 Paddle :: struct {
     width: int,
@@ -21,17 +26,18 @@ Paddle :: struct {
 }
 
 Ball :: struct {
-    width:  int,
-    height: int,
+    size: f32, // Will use same size for LxW of Rectangle (PONG USED RECTANGLE BALL)
+    speed:  rl.Vector2,
     pos:    rl.Vector2
 }
 
 Game_State :: struct {
-    player_paddle: Paddle,
-    cpu_paddle : Paddle,
+    player: Paddle,
+    cpu : Paddle,
     ball: Ball,
     player_score: int,
     cpu_score:    int,
+    max_score: int,
     scene: Game_Scene,
 }
 
@@ -48,10 +54,8 @@ Game_Scene :: enum {
 scene  := Game_Scene(.Menu)
 player := Paddle{PADDLE_WIDTH, PADDLE_HEIGHT, rl.Vector2{ WINDOW_WIDTH * .1 , WINDOW_HEIGHT / 2}}
 cpu    := Paddle{PADDLE_WIDTH, PADDLE_HEIGHT, rl.Vector2{ WINDOW_WIDTH * .9, WINDOW_HEIGHT / 2}}
-ball   := Ball{10, 10, rl.Vector2{0, 0}}
-state := Game_State{player, cpu, ball, 0, 0, scene}
-
-
+ball   := Ball{10, rl.Vector2{BALL_SPEED, BALL_SPEED}, rl.Vector2{0, 0}}
+state := Game_State{player, cpu, ball, 0, 0, MAX_SCORE, scene}
 
 
 main :: proc() {
@@ -60,31 +64,33 @@ main :: proc() {
     rl.SetTargetFPS(60)
 
     // Initialize Game State
-    reset_state()
+    reset_state(&state)
 
     rl.InitWindow(WINDOW_WIDTH, WINDOW_HEIGHT, "Odin Pong")
     defer rl.CloseWindow()
 
     // Main game Loop
     for !rl.WindowShouldClose() {
-	if scene ==      .Menu     { scene = scene_menu() }
-	else if scene == .NewGame  { scene = scene_new_game() }
-	else if scene == .Start    { scene = scene_game_start() }
-	else if scene == .GameOver { scene = scene_game_over() }
-	else if scene == .Pause    { scene = scene_pause() }
+	if scene ==      .Menu     { scene = scene_menu(&state) }
+	else if scene == .NewGame  { scene = scene_new_game(&state) }
+	else if scene == .Start    { scene = scene_game_start(&state) }
+	else if scene == .GameOver { scene = scene_game_over(&state) }
+	else if scene == .Pause    { scene = scene_pause(&state) }
     }
 }
 
-reset_state :: proc() {
+reset_state :: proc(state: ^Game_State) {
     player := Paddle{PADDLE_WIDTH, PADDLE_HEIGHT, rl.Vector2{ WINDOW_WIDTH * 0.15, WINDOW_HEIGHT / 2}}
     cpu    := Paddle{PADDLE_WIDTH, PADDLE_HEIGHT, rl.Vector2{ WINDOW_WIDTH * 0.85, WINDOW_HEIGHT / 2}}
-    ball   := Ball{10, 10, rl.Vector2{0, 0}}
-    state := Game_State{player, cpu, ball, 0, 0, scene}
+    ball   := Ball{10, rl.Vector2{BALL_SPEED, BALL_SPEED}, rl.Vector2{0, 0}}
+    state := Game_State{player, cpu, ball, 0, 0, 5, scene}
 }
 
+reset_round :: proc(state: ^Game_State) {
+}
 
-// Game Scene States
-scene_menu :: proc() -> Game_Scene {
+// ------------- Update Functions ------------------
+scene_menu :: proc(state: ^Game_State) -> Game_Scene {
 
     for !rl.WindowShouldClose() {
 
@@ -124,16 +130,43 @@ scene_menu :: proc() -> Game_Scene {
 
 }
 
-scene_new_game :: proc() -> Game_Scene {
+scene_new_game :: proc(state: ^Game_State) -> Game_Scene {
 
-    reset_state() 
+    reset_state(state) 
+	
+	random_ball_position := rand.float32_range(100, WINDOW_HEIGHT - 100)
+	state.ball.pos.x = WINDOW_CENTER - 5
+	state.ball.pos.y = random_ball_position
+	
+	number_flags := [4]int {0, 1, 2, 3}
+	random_start_vector_flag := rand.choice(number_flags[:])
+
+	switch random_start_vector_flag {
+	    case 0: state.ball.speed = {BALL_SPEED, -BALL_SPEED} // Top Right
+	    case 1: state.ball.speed = {-BALL_SPEED, -BALL_SPEED} // Top Left
+	    case 2: state.ball.speed = {-BALL_SPEED, BALL_SPEED} // Bottom left
+	    case 3: state.ball.speed = {BALL_SPEED, BALL_SPEED} // Bottom Right
+	}
+
+	fmt.println("Start Flag: %d", random_start_vector_flag)
+	fmt.println("Speed Vecotr: %d", state.ball.speed)
 
      for !rl.WindowShouldClose() {
 	rl.BeginDrawing()
 	rl.ClearBackground(rl.BLACK)
+
 	draw_seperator_line()
-	draw_score_text(state.player_score, state.cpu_score)
-	draw_player_paddle(state.player_paddle.pos)
+	draw_score_text(state)
+	draw_player(state)
+	draw_cpu(state)
+	draw_ball(state)
+
+	start_text := fmt.ctprintf("Press SPACE")
+	start_text_con := fmt.ctprintf("to start!")
+	st_width := rl.MeasureText(start_text, 24)
+
+	rl.DrawText(start_text, WINDOW_CENTER - st_width - 20, WINDOW_HEIGHT / 2, 24, rl.WHITE)
+	rl.DrawText(start_text_con, WINDOW_CENTER + 20, WINDOW_HEIGHT / 2, 24, rl.WHITE)
 	if rl.IsKeyPressed(.SPACE) { return .Start }
 	
 	rl.EndDrawing()
@@ -143,7 +176,7 @@ scene_new_game :: proc() -> Game_Scene {
     return .NewGame
 }
 
-scene_game_start :: proc() -> Game_Scene {
+scene_game_start :: proc(state: ^Game_State) -> Game_Scene {
 
     for !rl.WindowShouldClose() {
 	rl.BeginDrawing()
@@ -152,37 +185,78 @@ scene_game_start :: proc() -> Game_Scene {
 	delta := rl.GetFrameTime()
 	player_input : rl.Vector2
 	
-	if rl.IsKeyDown(.S) || rl.IsKeyDown(.DOWN) {
-	    player_input.y += 1 * 500 * delta
-	}
-	else if rl.IsKeyDown(.W) || rl.IsKeyDown(.UP) {
-	    player_input.y -= 1 * 500 * delta
+	{ // Handle Player Updates 
+	    if rl.IsKeyDown(.S) || rl.IsKeyDown(.DOWN) {
+		player_input.y += 1 * 500 * delta
+
+	    }
+	    else if rl.IsKeyDown(.W) || rl.IsKeyDown(.UP) {
+		player_input.y -= 1 * 500 * delta
+	    }
+	    state.player.pos += player_input
+
+	    // Clamps the positions of the paddles between the WINDOW_HEIGHT on the Y axis
+	    state.player.pos.y = linalg.clamp(state.player.pos.y, 0, WINDOW_HEIGHT - PADDLE_HEIGHT)
+
 	}
 
-	state.player_paddle.pos += player_input
 
-	fmt.println("Player position %d", state.player_paddle.pos.y)
+	{ // Handle CPU Updates 
+	    state.cpu.pos.y = linalg.clamp(state.cpu.pos.y, 0, WINDOW_HEIGHT - PADDLE_HEIGHT)
+	}
+	
+
+	{ // Handle Ball Updates
+	    state.ball.pos += state.ball.speed
+	    
+	    // Collision handling with top & bottom of screen
+	    if state.ball.pos.y - BALL_SIZE <= 0 {
+		state.ball.speed.y = -state.ball.speed.y
+		state.ball.pos.y = BALL_SIZE 
+	    } else if state.ball.pos.y >= WINDOW_HEIGHT - BALL_SIZE {
+		state.ball.speed.y = -state.ball.speed.y
+		state.ball.pos.y = WINDOW_HEIGHT - BALL_SIZE
+	    }
+	    
+	    // FIX ME: Goal Scored keeps incremeting because of game loop
+	    if state.ball.pos.x - BALL_SIZE <= 0 {
+		state.cpu_score += 1
+	    } else if state.ball.pos.x > WINDOW_WIDTH - BALL_SIZE {
+		state.player_score +=1
+	    }
+
+	    // Handle Paddle Collision
+	}
+
 
 	draw_seperator_line()
-	draw_score_text(state.player_score, state.cpu_score)
-	draw_player_paddle(state.player_paddle.pos)
+	draw_score_text(state)
+	draw_player(state)
+	draw_cpu(state)
+	draw_ball(state)
 
 	rl.EndDrawing()
     }
     return .Start
 }
 
-scene_game_over :: proc() -> Game_Scene {
+scene_game_over :: proc(state: ^Game_State) -> Game_Scene {
+
+    for !rl.WindowShouldClose() {
+	rl.BeginDrawing()
+	defer rl.EndDrawing()
+	rl.ClearBackground(rl.BLACK)
+
+	//TODO; Draw Winnter text & show button to restart the game
+    }
     return .GameOver
 }
 
-scene_pause :: proc() -> Game_Scene {
+scene_pause :: proc(state: ^Game_State) -> Game_Scene {
     return .Pause
 }
 
-
-
-// Rendering Functions
+// -------------- Rendering Functions- ----------------
 draw_seperator_line :: proc() {
     x: i32 = 0
 
@@ -192,31 +266,44 @@ draw_seperator_line :: proc() {
     }
 }
 
-draw_score_text :: proc(player_score: int, cpu_score: int) {
+draw_score_text :: proc(state: ^Game_State) {
     // Player Score
-    player_text := fmt.ctprintf("%d", player_score)
+    player_text := fmt.ctprintf("%d", state.player_score)
     rl.DrawText(player_text, WINDOW_CENTER * 0.5, 20, 64, rl.WHITE)
 
     // CPU Score
-    cpu_text := fmt.ctprintf("%d", cpu_score)
+    cpu_text := fmt.ctprintf("%d", state.cpu_score)
     rl.DrawText(cpu_text, WINDOW_CENTER * 1.5, 20, 64, rl.WHITE)
 }
 
-draw_player_paddle :: proc(player_position: rl.Vector2) {
+draw_player :: proc(state: ^Game_State) {
     
-	player_pos_x, player_pos_y := i32(player_position.x), i32(player_position.y)
-	rl.DrawRectangle(
-	    player_pos_x, 
-	    player_pos_y, 
-	    PADDLE_WIDTH,
-	    PADDLE_HEIGHT,
-	    rl.WHITE
-	)
+    player_pos_x, player_pos_y := i32(state.player.pos.x), i32(state.player.pos.y)
+    rl.DrawRectangle(
+	player_pos_x, 
+	player_pos_y, 
+	PADDLE_WIDTH,
+	PADDLE_HEIGHT,
+	rl.WHITE
+    )
    
 }
 
-draw_ball :: proc() {
+draw_cpu :: proc(state: ^Game_State) {
 
+    cpu_pos_x, cpu_pos_y := i32(state.cpu.pos.x), i32(state.cpu.pos.y)
+    rl.DrawRectangle(
+	cpu_pos_x, 
+	cpu_pos_y,
+	PADDLE_WIDTH,
+	PADDLE_HEIGHT,
+	rl.WHITE
+    )
+}
+
+draw_ball :: proc(state: ^Game_State) {
+    ball_pos_x, ball_pos_y := i32(state.ball.pos.x), i32(state.ball.pos.y)
+    rl.DrawRectangle(ball_pos_x, ball_pos_y, BALL_SIZE, BALL_SIZE, rl.WHITE)     
 }
 
 
