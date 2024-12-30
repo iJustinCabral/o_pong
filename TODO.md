@@ -35,10 +35,21 @@ Add sound effect for ball paddle hit
 *Randomize ball start vector  
 *Ball bouncing off top & bottom of screen  
 
-Next Round After Score  
-CPU Paddle AI  
-Game Over Scene  
-Add Sound FX for ball bounce  
-Add Sound FX Ball paddle hit  
-Add Sound FX for Goal Score  
++Next Round After Score  
++CPU Paddle AI  
++Game Over Scene  
++Add Sound FX for ball bounce  
++Add Sound FX Ball paddle hit  
++Add Sound FX for Goal Score  
 
+### -= 12/29/2024 =-
+
+*Handle ball paddle collision 
+*Add Sound FX for ball bounce  
+*Add Sound FX for ball paddle hit  
+*Add Sound FX for Gaol Score  
+*Game Over Scene  
+*Handle Round After Score  
+*CPU Paddle AI  
+
+### GAME COMPLETE
